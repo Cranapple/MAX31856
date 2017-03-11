@@ -51,7 +51,8 @@ class max31856(object):
 		#self.writeRegister(1, 0x00) #for B Type
 		#self.writeRegister(1, 0x01) #for E Type
 		#self.writeRegister(1, 0x02) #for J Type
-		self.writeRegister(1, 0x03) #for K Type
+                for i in range(5):
+                        self.writeRegister(1, 0x03, i) #for K Type
 		#self.writeRegister(1, 0x04) #for N Type
 		#self.writeRegister(1, 0x05) #for R Type
 		#self.writeRegister(1, 0x06) #for S Type
@@ -79,7 +80,7 @@ class max31856(object):
 	
 	def readThermocoupleTemp(self):
 		self.requestTempConv()
-
+                temp_C = []
 		# read 4 registers starting with register 12
 		for i in range(5):
 			out = self.readRegisters(0x0c, 4, i) 
@@ -147,7 +148,8 @@ class max31856(object):
 		# bit 0: 50/60 Hz filter select                  -> 0 (60Hz)
 		#
 		# write config register 0
-		self.writeRegister(0, 0x42)
+                for i in range(5):
+                        self.writeRegister(0, 0x42, i)
 		# conversion time is less than 150ms
 		time.sleep(.2) #give it 200ms for conversion
 
@@ -206,14 +208,14 @@ class FaultError(Exception):
 if __name__ == "__main__":
 
 	import max31856
-	csPin = [8, 1, 2, 3, 4]
-	misoPin = 9
-	mosiPin = 10
-	clkPin = 11
-	max = max31856.max31856(csPin,misoPin,mosiPin,clkPin)
-	thermoTempC = max.readThermocoupleTemp()
-	thermoTempF = (thermoTempC * 9.0/5.0) + 32
-	print "Thermocouple Temp: %f, %f, %f, %f, %f" % thermoTempF[0], thermoTempF[0], thermoTempF[0], thermoTempF[0], thermoTempF[0]
+	csPins = [11, 13, 15, 12, 16]
+	misoPin = 5
+	mosiPin = 7
+	clkPin = 3
+	max = max31856.max31856(csPins,misoPin,mosiPin,clkPin)
+        while(1):
+                thermoTempC = max.readThermocoupleTemp()
+                print "Thermocouple Temp: %f, %f, %f, %f, %f" % (thermoTempC[0], thermoTempC[1], thermoTempC[2], thermoTempC[3], thermoTempC[4])
 	#juncTempC = max.readJunctionTemp()
 	#juncTempF = (juncTempC * 9.0/5.0) + 32
 	#print "Cold Junction Temp: %f degF" % juncTempF
