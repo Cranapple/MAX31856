@@ -29,8 +29,8 @@ class max31856(object):
 	   Any pins can be used for CS (chip select), MISO, MOSI and CLK
 	"""
 
-	def __init__(self, csPin = 8, misoPin = 9, mosiPin = 10, clkPin = 11):
-		self.csPin = csPin
+	def __init__(self, csPins, misoPin, mosiPin, clkPin):
+		self.csPins = csPins
 		self.misoPin = misoPin
 		self.mosiPin = mosiPin
 		self.clkPin = clkPin
@@ -59,13 +59,21 @@ class max31856(object):
 		
 	def setupGPIO(self):
 		GPIO.setwarnings(False)
-		GPIO.setmode(GPIO.BCM)
-		GPIO.setup(self.csPin, GPIO.OUT)
+		GPIO.setmode(GPIO.BOARD)
+		GPIO.setup(self.csPins[0], GPIO.OUT)
+		GPIO.setup(self.csPins[1], GPIO.OUT)
+		GPIO.setup(self.csPins[2], GPIO.OUT)
+		GPIO.setup(self.csPins[3], GPIO.OUT)
+		GPIO.setup(self.csPins[4], GPIO.OUT)
 		GPIO.setup(self.misoPin, GPIO.IN)
 		GPIO.setup(self.mosiPin, GPIO.OUT)
 		GPIO.setup(self.clkPin, GPIO.OUT)
 
-		GPIO.output(self.csPin, GPIO.HIGH)
+		GPIO.output(self.csPins[0], GPIO.HIGH)
+		GPIO.output(self.csPins[1], GPIO.HIGH)
+		GPIO.output(self.csPins[2], GPIO.HIGH)
+		GPIO.output(self.csPins[3], GPIO.HIGH)
+		GPIO.output(self.csPins[4], GPIO.HIGH)
 		GPIO.output(self.clkPin, GPIO.LOW)
 		GPIO.output(self.mosiPin, GPIO.LOW)	
 	
@@ -73,34 +81,35 @@ class max31856(object):
 		self.requestTempConv()
 
 		# read 4 registers starting with register 12
-		out = self.readRegisters(0x0c, 4) 
-		
-		[tc_highByte, tc_middleByte, tc_lowByte] = [out[0], out[1], out[2]]	
-		temp = ((tc_highByte << 16) | (tc_middleByte << 8) | tc_lowByte) >> 5
-		
-		if (tc_highByte & 0x80):
-			temp -= 0x80000
-		
-		temp_C = temp * 0.0078125
-		
-		fault = out[3]
-		
-		if ((fault & 0x80) == 1):
-			raise FaultError("Cold Junction Out-of-Range")
-		if ((fault & 0x40) == 1):
-			raise FaultError("Thermocouple Out-of-Range")
-		if ((fault & 0x20) == 1):
-			raise FaultError("Cold-Junction High Fault")
-		if ((fault & 0x10) == 1):
-			raise FaultError("Cold-Junction Low Fault")
-		if ((fault & 0x08) == 1):
-			raise FaultError("Thermocouple Temperature High Fault")
-		if ((fault & 0x04) == 1):
-			raise FaultError("Thermocouple Temperature Low Fault")
-		if ((fault & 0x02) == 1):
-			raise FaultError("Overvoltage or Undervoltage Input Fault")
-		if ((fault & 0x01) == 1):
-			raise FaultError("Thermocouple Open-Circuit Fault")
+		for i in range(5):
+			out = self.readRegisters(0x0c, 4, i) 
+			
+			[tc_highByte, tc_middleByte, tc_lowByte] = [out[0], out[1], out[2]]	
+			temp = ((tc_highByte << 16) | (tc_middleByte << 8) | tc_lowByte) >> 5
+			
+			if (tc_highByte & 0x80):
+				temp -= 0x80000
+			
+			temp_C.append(temp * 0.0078125)
+			
+			fault = out[3]
+			
+			if ((fault & 0x80) == 1):
+				raise FaultError("Cold Junction Out-of-Range")
+			if ((fault & 0x40) == 1):
+				raise FaultError("Thermocouple Out-of-Range")
+			if ((fault & 0x20) == 1):
+				raise FaultError("Cold-Junction High Fault")
+			if ((fault & 0x10) == 1):
+				raise FaultError("Cold-Junction Low Fault")
+			if ((fault & 0x08) == 1):
+				raise FaultError("Thermocouple Temperature High Fault")
+			if ((fault & 0x04) == 1):
+				raise FaultError("Thermocouple Temperature Low Fault")
+			if ((fault & 0x02) == 1):
+				raise FaultError("Overvoltage or Undervoltage Input Fault")
+			if ((fault & 0x01) == 1):
+				raise FaultError("Thermocouple Open-Circuit Fault")
 				
 		return temp_C
 				
@@ -142,8 +151,8 @@ class max31856(object):
 		# conversion time is less than 150ms
 		time.sleep(.2) #give it 200ms for conversion
 
-	def writeRegister(self, regNum, dataByte):
-		GPIO.output(self.csPin, GPIO.LOW)
+	def writeRegister(self, regNum, dataByte, csNum):
+		GPIO.output(self.csPins[csNum], GPIO.LOW)
 		
 		# 0x8x to specify 'write register value'
 		addressByte = 0x80 | regNum;
@@ -153,12 +162,12 @@ class max31856(object):
 		# the rest are data bytes
 		self.sendByte(dataByte)
 
-		GPIO.output(self.csPin, GPIO.HIGH)
+		GPIO.output(self.csPins[csNum], GPIO.HIGH)
 
 		
-	def readRegisters(self, regNumStart, numRegisters):
+	def readRegisters(self, regNumStart, numRegisters, csNum):
 		out = []
-		GPIO.output(self.csPin, GPIO.LOW)
+		GPIO.output(self.csPins[csNum], GPIO.LOW)
 		
 		# 0x to specify 'read register value'
 		self.sendByte(regNumStart)
@@ -167,7 +176,7 @@ class max31856(object):
 			data = self.recvByte()
 			out.append(data)
 
-		GPIO.output(self.csPin, GPIO.HIGH)
+		GPIO.output(self.csPins[csNum], GPIO.HIGH)
 		return out
 
 	def sendByte(self,byte):
@@ -197,15 +206,15 @@ class FaultError(Exception):
 if __name__ == "__main__":
 
 	import max31856
-	csPin = 8
+	csPin = [8, 1, 2, 3, 4]
 	misoPin = 9
 	mosiPin = 10
 	clkPin = 11
 	max = max31856.max31856(csPin,misoPin,mosiPin,clkPin)
 	thermoTempC = max.readThermocoupleTemp()
 	thermoTempF = (thermoTempC * 9.0/5.0) + 32
-	print "Thermocouple Temp: %f degF" % thermoTempF
-	juncTempC = max.readJunctionTemp()
-	juncTempF = (juncTempC * 9.0/5.0) + 32
-	print "Cold Junction Temp: %f degF" % juncTempF
+	print "Thermocouple Temp: %f, %f, %f, %f, %f" % thermoTempF[0], thermoTempF[0], thermoTempF[0], thermoTempF[0], thermoTempF[0]
+	#juncTempC = max.readJunctionTemp()
+	#juncTempF = (juncTempC * 9.0/5.0) + 32
+	#print "Cold Junction Temp: %f degF" % juncTempF
 	GPIO.cleanup()
